@@ -1,49 +1,40 @@
-name: Photo + Audio Stream (Auto Reconnect + Restart)
+name: Photo + Audio Stream (Stable)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
-  photo-audio-stream:
+  stream:
     runs-on: ubuntu-latest
-
-    timeout-minutes: 355   # ~5h55m (GitHub limit se thoda kam)
+    timeout-minutes: 350
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Install FFmpeg
         run: |
           sudo apt update
           sudo apt install -y ffmpeg
 
-      - name: Verify Files
+      - name: Check Files
         run: |
-          if [ ! -f "./background.png" ]; then
+          ls -l
+          if [ ! -f "background.png" ]; then
             echo "background.png missing!" && exit 1
           fi
-          if [ ! -f "./audio.mp3" ]; then
+          if [ ! -f "audio.mp3" ]; then
             echo "audio.mp3 missing!" && exit 1
           fi
-          echo "Files OK"
 
-      - name: Start Stable Stream
+      - name: Start Stream
         run: |
-          STREAM_URL="rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
+          STREAM="rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
 
           while true
           do
             echo "Starting stream..."
 
-            ffmpeg \
-              -reconnect 1 \
-              -reconnect_streamed 1 \
-              -reconnect_delay_max 10 \
-              -re \
+            ffmpeg -re \
               -loop 1 -i background.png \
               -stream_loop -1 -i audio.mp3 \
               -c:v libx264 \
@@ -51,16 +42,14 @@ jobs:
               -tune stillimage \
               -pix_fmt yuv420p \
               -g 50 \
-              -b:v 2500k \
-              -maxrate 2500k \
-              -bufsize 5000k \
+              -b:v 2000k \
               -c:a aac \
-              -b:a 160k \
-              -ar 44100 \
-              -f flv \
+              -b:a 128k \
+              -shortest \
               -t 05:40:00 \
-              "$STREAM_URL"
+              -f flv \
+              "$STREAM"
 
-            echo "Stream crashed or finished. Restarting in 15s..."
-            sleep 15
+            echo "Restarting in 10s..."
+            sleep 10
           done
