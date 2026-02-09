@@ -1,4 +1,4 @@
-name: Photo + Audio Stream (5:40 hrs Auto-Restart)
+name: Photo + Audio Stream (Auto Reconnect + Restart)
 
 on:
   workflow_dispatch:
@@ -10,53 +10,57 @@ jobs:
   photo-audio-stream:
     runs-on: ubuntu-latest
 
-    # 👉 Secret yahin pass ho raha hai
-    env:
-      YOUTUBE_STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
+    timeout-minutes: 355   # ~5h55m (GitHub limit se thoda kam)
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Install FFmpeg & curl
+      - name: Install FFmpeg
         run: |
           sudo apt update
-          sudo apt install -y ffmpeg curl
+          sudo apt install -y ffmpeg
 
-      - name: Show Workspace Files (Debug)
+      - name: Verify Files
         run: |
-          echo "Workspace: $GITHUB_WORKSPACE"
-          ls -la
-          ls -la "$GITHUB_WORKSPACE"
-
-      - name: Verify Background Image and Audio
-        run: |
-          if [ ! -f "$GITHUB_WORKSPACE/background.png" ]; then
-            echo "❌ Error: background.png not found in workspace!" && exit 1
+          if [ ! -f "./background.png" ]; then
+            echo "background.png missing!" && exit 1
           fi
-
-          if [ ! -f "$GITHUB_WORKSPACE/audio.mp3" ]; then
-            echo "❌ Error: audio.mp3 not found in workspace!" && exit 1
+          if [ ! -f "./audio.mp3" ]; then
+            echo "audio.mp3 missing!" && exit 1
           fi
+          echo "Files OK"
 
-          echo "✅ Background image and audio found successfully."
-
-      - name: Start 5:40 hrs Photo + Audio Stream with Auto-Restart
+      - name: Start Stable Stream
         run: |
-          cd "$GITHUB_WORKSPACE"
+          STREAM_URL="rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
 
-          # 🔍 Debug: check secret length (should be >0)
-          echo "Stream key length: ${#YOUTUBE_STREAM_KEY}"
+          while true
+          do
+            echo "Starting stream..."
 
-          while true; do
-            echo "▶ Starting photo + audio stream for 5:40 hours..."
-            ffmpeg -re -loop 1 -i background.png -i audio.mp3 \
-              -c:v libx264 -tune stillimage -pix_fmt yuv420p \
-              -c:a aac -b:a 192k \
-              -shortest \
+            ffmpeg \
+              -reconnect 1 \
+              -reconnect_streamed 1 \
+              -reconnect_delay_max 10 \
+              -re \
+              -loop 1 -i background.png \
+              -stream_loop -1 -i audio.mp3 \
+              -c:v libx264 \
+              -preset veryfast \
+              -tune stillimage \
+              -pix_fmt yuv420p \
+              -g 50 \
+              -b:v 2500k \
+              -maxrate 2500k \
+              -bufsize 5000k \
+              -c:a aac \
+              -b:a 160k \
+              -ar 44100 \
+              -f flv \
               -t 05:40:00 \
-              -f flv rtmp://a.rtmp.youtube.com/live2/$YOUTUBE_STREAM_KEY
+              "$STREAM_URL"
 
-            echo "🔁 Stream ended. Restarting in 10 seconds..."
-            sleep 10
+            echo "Stream crashed or finished. Restarting in 15s..."
+            sleep 15
           done
