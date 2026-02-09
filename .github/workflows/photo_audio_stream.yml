@@ -10,6 +10,10 @@ jobs:
   photo-audio-stream:
     runs-on: ubuntu-latest
 
+    # 👉 Secret yahin pass ho raha hai
+    env:
+      YOUTUBE_STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -40,6 +44,9 @@ jobs:
       - name: Start 5:40 hrs Photo + Audio Stream with Auto-Restart
         run: |
           cd "$GITHUB_WORKSPACE"
+
+          # 🔍 Debug: check secret length (should be >0)
+          echo "Stream key length: ${#YOUTUBE_STREAM_KEY}"
 
           while true; do
             echo "▶ Starting photo + audio stream for 5:40 hours..."
