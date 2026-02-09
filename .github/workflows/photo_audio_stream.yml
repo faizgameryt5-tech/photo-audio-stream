@@ -19,26 +19,37 @@ jobs:
           sudo apt update
           sudo apt install -y ffmpeg curl
 
+      - name: Show Workspace Files (Debug)
+        run: |
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la
+          ls -la "$GITHUB_WORKSPACE"
+
       - name: Verify Background Image and Audio
         run: |
-          if [ ! -f "./background.png" ]; then
-            echo "Error: background.png not found!" && exit 1
+          if [ ! -f "$GITHUB_WORKSPACE/background.png" ]; then
+            echo "❌ Error: background.png not found in workspace!" && exit 1
           fi
-          if [ ! -f "./audio.mp3" ]; then
-            echo "Error: audio.mp3 not found!" && exit 1
+
+          if [ ! -f "$GITHUB_WORKSPACE/audio.mp3" ]; then
+            echo "❌ Error: audio.mp3 not found in workspace!" && exit 1
           fi
-          echo "Background image and audio found."
+
+          echo "✅ Background image and audio found successfully."
 
       - name: Start 5:40 hrs Photo + Audio Stream with Auto-Restart
         run: |
+          cd "$GITHUB_WORKSPACE"
+
           while true; do
-            echo "Starting photo + audio stream for 5:40 hours..."
+            echo "▶ Starting photo + audio stream for 5:40 hours..."
             ffmpeg -re -loop 1 -i background.png -i audio.mp3 \
               -c:v libx264 -tune stillimage -pix_fmt yuv420p \
               -c:a aac -b:a 192k \
               -shortest \
               -t 05:40:00 \
-              -f flv rtmp://a.rtmp.youtube.com/live2
-            echo "Stream completed. Restarting in 10 seconds..."
+              -f flv rtmp://a.rtmp.youtube.com/live2/$YOUTUBE_STREAM_KEY
+
+            echo "🔁 Stream ended. Restarting in 10 seconds..."
             sleep 10
           done
