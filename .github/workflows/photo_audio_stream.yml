@@ -1,15 +1,18 @@
-name: Photo + Audio Stream (Stable)
+name: Photo + Audio Stream (Stable & Auto-Restart)
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [restart_stream]
 
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 358 # GitHub ki limit 360 min hai, hum thoda pehle stop karenge
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Install FFmpeg
         run: |
@@ -18,38 +21,37 @@ jobs:
 
       - name: Check Files
         run: |
-          ls -l
-          if [ ! -f "background.png" ]; then
-            echo "background.png missing!" && exit 1
-          fi
-          if [ ! -f "audio.mp3" ]; then
-            echo "audio.mp3 missing!" && exit 1
-          fi
+          if [ ! -f "background.png" ]; then echo "background.png missing!" && exit 1; fi
+          if [ ! -f "audio.mp3" ]; then echo "audio.mp3 missing!" && exit 1; fi
 
-      - name: Start Stream
+      - name: Start Live Stream
+        env:
+          # Aapka Stream Key (Security ke liye ise bhi Secret mein daal sakte hain)
+          STREAM_URL: "rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
+          # Aapka Personal Access Token (GH_PAT)
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          STREAM="rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
+          echo "Stream starting for 5 hours and 50 minutes..."
+          
+          ffmpeg -re \
+            -loop 1 -i background.png \
+            -stream_loop -1 -i audio.mp3 \
+            -c:v libx264 \
+            -preset veryfast \
+            -tune stillimage \
+            -pix_fmt yuv420p \
+            -g 50 \
+            -b:v 2000k \
+            -c:a aac \
+            -b:a 128k \
+            -t 05:50:00 \
+            -f flv \
+            "$STREAM_URL"
 
-          while true
-          do
-            echo "Starting stream..."
-
-            ffmpeg -re \
-              -loop 1 -i background.png \
-              -stream_loop -1 -i audio.mp3 \
-              -c:v libx264 \
-              -preset veryfast \
-              -tune stillimage \
-              -pix_fmt yuv420p \
-              -g 50 \
-              -b:v 2000k \
-              -c:a aac \
-              -b:a 128k \
-              -shortest \
-              -t 05:40:00 \
-              -f flv \
-              "$STREAM"
-
-            echo "Restarting in 10s..."
-            sleep 10
-          done
+          echo "FFmpeg finished. Triggering next workflow for 24/7 stream..."
+          
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -d '{"event_type": "restart_stream"}'
