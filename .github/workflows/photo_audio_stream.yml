@@ -1,4 +1,4 @@
-name: Photo + Audio Stream (Stable & Auto-Restart)
+name: Video + Audio Stream (Loop & Auto-Restart)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 358 # GitHub ki limit 360 min hai, hum thoda pehle stop karenge
+    timeout-minutes: 358 
 
     steps:
       - name: Checkout Code
@@ -21,24 +21,23 @@ jobs:
 
       - name: Check Files
         run: |
-          if [ ! -f "background.png" ]; then echo "background.png missing!" && exit 1; fi
+          # Check karein ki video aur audio files folder mein hain ya nahi
+          if [ ! -f "video.mp4" ]; then echo "video.mp4 missing!" && exit 1; fi
           if [ ! -f "audio.mp3" ]; then echo "audio.mp3 missing!" && exit 1; fi
 
       - name: Start Live Stream
         env:
-          # Aapka Stream Key (Security ke liye ise bhi Secret mein daal sakte hain)
           STREAM_URL: "rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
-          # Aapka Personal Access Token (GH_PAT)
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "Stream starting for 5 hours and 50 minutes..."
+          echo "Video stream starting with background audio for 5 hours and 50 minutes..."
           
           ffmpeg -re \
-            -loop 1 -i background.png \
+            -stream_loop -1 -i video.mp4 \
             -stream_loop -1 -i audio.mp3 \
+            -map 0:v:0 -map 1:a:0 \
             -c:v libx264 \
             -preset veryfast \
-            -tune stillimage \
             -pix_fmt yuv420p \
             -g 50 \
             -b:v 2000k \
@@ -48,7 +47,7 @@ jobs:
             -f flv \
             "$STREAM_URL"
 
-          echo "FFmpeg finished. Triggering next workflow for 24/7 stream..."
+          echo "FFmpeg finished. Triggering next workflow..."
           
           curl -X POST \
             -H "Authorization: token $GH_TOKEN" \
